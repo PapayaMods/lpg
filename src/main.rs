@@ -1,9 +1,29 @@
+use clap::Parser;
 use image::{imageops::FilterType, DynamicImage, ImageBuffer, ImageFormat, Rgba};
+use std::fs;
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Cli {
+    #[arg(short = 't', long = "templates", help = "Path to templates directory")]
+    templates: std::path::PathBuf,
+
+    #[arg(short = 'i', long = "input", help = "Path to input directory")]
+    input: std::path::PathBuf,
+
+    #[arg(short = 'o', long = "output", help = "Path to output directory")]
+    output: std::path::PathBuf,
+}
 
 fn main() {
-    let poster_template: DynamicImage = image::open("./posters_template.png").unwrap();
-    let painting_template: DynamicImage = image::open("./painting_template.png").unwrap();
-    let p: Vec<DynamicImage> = std::fs::read_dir("./input")
+    let args = Cli::parse();
+
+    let path_tpls = fs::canonicalize(args.templates).unwrap();
+    let path_input = fs::canonicalize(args.input).unwrap();
+    let path_output = fs::canonicalize(args.output).unwrap();
+
+    let poster_template: DynamicImage = image::open(path_tpls.join("poster_tpl.png")).unwrap();
+    let painting_template: DynamicImage = image::open(path_tpls.join("painting_tpl.png")).unwrap();
+    let p: Vec<DynamicImage> = std::fs::read_dir(path_input)
         .unwrap()
         .flat_map(Result::ok)
         .map(|f| f.path())
@@ -11,12 +31,13 @@ fn main() {
         .flat_map(Result::ok)
         .collect();
 
-    let poster_dir = "./output/BepInEx/plugins/LethalPosters/posters";
-    let tips_dir = "./output/BepInEx/plugins/LethalPosters/tips";
-    let paintings_dir = "./output/BepInEx/plugins/LethalPaintings/paintings";
-    std::fs::create_dir_all(poster_dir).unwrap();
-    std::fs::create_dir_all(tips_dir).unwrap();
-    std::fs::create_dir_all(paintings_dir).unwrap();
+    let poster_dir = path_output.join("BepInEx/plugins/LethalPosters/posters");
+    let tips_dir = path_output.join("BepInEx/plugins/LethalPosters/tips");
+    let paintings_dir = path_output.join("BepInEx/plugins/LethalPaintings/paintings");
+
+    std::fs::create_dir_all(poster_dir.clone()).unwrap();
+    std::fs::create_dir_all(tips_dir.clone()).unwrap();
+    std::fs::create_dir_all(paintings_dir.clone()).unwrap();
 
     for i in 0..p.len() {
         generate_atlas(
@@ -29,16 +50,16 @@ fn main() {
                 g(&p, i + 4),
             ],
         )
-        .save_with_format(format!("{poster_dir}/{i}.png"), ImageFormat::Png)
+        .save_with_format(poster_dir.join(format!("{i}.png")), ImageFormat::Png)
         .unwrap();
 
         generate_tips(g(&p, i))
-            .save_with_format(format!("{tips_dir}/{i}.png"), ImageFormat::Png)
+            .save_with_format(tips_dir.join(format!("{i}.png")), ImageFormat::Png)
             .unwrap();
 
-            generate_painting(&painting_template, g(&p, i))
-                .save_with_format(format!("{paintings_dir}/{i}.png"), ImageFormat::Png)
-                .unwrap();
+        generate_painting(&painting_template, g(&p, i))
+            .save_with_format(paintings_dir.join(format!("{i}.png")), ImageFormat::Png)
+            .unwrap();
     }
 }
 
